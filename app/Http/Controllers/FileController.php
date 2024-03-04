@@ -20,7 +20,7 @@ class FileController extends Controller
 
 public function upload(Request $request)
 {
-    // Проведем валидацию файлов
+    // Производим валидацию загружаемых файлов
     $validator = Validator::make($request->all(), [
         'files.*' => 'required|file|mimes:doc,pdf,docx,zip,jpeg,jpg,png,exe|max:2048',
     ]);
@@ -32,17 +32,17 @@ public function upload(Request $request)
         ])->setStatusCode(422);
     }
 
-    // Получаем массив файлов
+    // Получаем массив файлов для загрузки
     $files = $request->file('files');
 $responses = [];
-    // Перебираем каждый файл для загрузки
+    // Обрабатываем каждый файл для загрузки
     foreach ($files as $file) {
-        // Проверяем валидность файла
+        // Проверяем, является ли файл действительным
         if ($file->isValid()) {
-            // Генерируем уникальное имя файла
+            // Генерируем уникальное имя файла на основе текущего времени и его оригинального имени
             $fileName = time() . '_' . $file->getClientOriginalName();
 
-            // Путь сохранения файла
+            // Определяем путь для сохранения файла
             $filePath = 'uploads/'. Auth::id();
 
             // Сохраняем файл
