@@ -15,5 +15,11 @@ class File extends Model
         'extension',
         'path',
         'file_id',
+
     ];
+    public function rights()
+    {
+        return $this->hasMany(Right::class);
+    }
+
 }
