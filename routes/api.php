@@ -43,8 +43,8 @@ Route::middleware('auth:api')->group( function () {
     // Удаление прав доступа
     Route::delete('/files/{file_id}/accesses', [RightController::class, 'destroy']);
 
-    // Просмотр файлов пользователя
+    // Просмотр файлов пользователя с изменнненым URL, с прошлой выводило 404 ошибку
     Route::get('/file/disk', [FileController::class, 'owned']);
-    // Просмотр файлов, к которым имеет доступ пользователь
+    // Просмотр файлов, к которым имеет доступ пользователь с изменнненым URL, с прошлой выводило 404 ошибку
     Route::get('/file/shared', [FileController::class, 'allowed']);
 });
