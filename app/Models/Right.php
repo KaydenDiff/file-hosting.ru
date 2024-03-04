@@ -11,6 +11,10 @@ class Right extends Model
     protected $fillable = ['file_id','user_id'];
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
+    }
+    public function file()
+    {
+        return $this->belongsTo(File::class, 'file_id', 'id');
     }
 }

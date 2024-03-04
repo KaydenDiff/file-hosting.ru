@@ -44,7 +44,7 @@ Route::middleware('auth:api')->group( function () {
     Route::delete('/files/{file_id}/accesses', [RightController::class, 'destroy']);
 
     // Просмотр файлов пользователя
-    Route::get('/files/disk', [FileController::class, 'owned']);
+    Route::get('/file/disk', [FileController::class, 'owned']);
     // Просмотр файлов, к которым имеет доступ пользователь
-    Route::get('/files/shared', [FileController::class, 'allowed']);
+    Route::get('/file/shared', [FileController::class, 'allowed']);
 });

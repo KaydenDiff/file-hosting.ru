@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\FileRenameRequest;
 use App\Http\Requests\FileStoreRequest;
 use App\Models\File;
+use App\Models\Right;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -47,22 +49,22 @@ $responses = [];
             $file->storeAs($filePath, $fileName);
 
             // Создаем запись о файле в БД
-            $kakashki = File::create([
+            $createNote = File::create([
                 'user_id' => Auth::id(),
                 'name' => $fileName,
                 'extension' => $file->extension(), // Добавьте расширение файла
                 'path' => $filePath, // Добавьте путь к файлу
                 'file_id' => Str::random(10), // Уникальный идентификатор файла, если используется
             ]);
-            $url = route('files.get', ['file_id' => $kakashki->file_id]);
+            $url = route('files.get', ['file_id' => $createNote->file_id]);
         }
         $responses[] = [
             "success"=> true,
      "code"=> 200,
      "message"=> "Success",
-     "name"=>  $kakashki->name,
+     "name"=>  $createNote->name,
      "url"=> $url,
-     "file_id"=>$kakashki->file_id
+     "file_id"=>$createNote->file_id
 
         ];
     }
@@ -72,6 +74,7 @@ $responses = [];
 
 
 }
+
     public function edit(Request $request, $file_id)
     {
         // Проверка аутентификации пользователя
@@ -101,10 +104,19 @@ $responses = [];
 
         // Валидация параметра name
         $validatedData = $request->validate([
-            'name' => 'required|unique:files,name',
+            'name' => 'required|unique:files,name',//todo переделать на request
         ]);
 
-        // Обновление имени файла
+        // Получаем старый путь к файлу
+        $oldFilePath = 'uploads/' . $file->user_id . '/' . $file->name;
+
+        // Формируем новый путь к файлу
+        $newFilePath = 'uploads/' . $file->user_id . '/' . $validatedData['name'];
+
+        // Переименовываем файл
+        Storage::move($oldFilePath, $newFilePath);
+
+        // Обновляем имя файла в базе данных
         $file->name = $validatedData['name'];
         $file->save();
 
@@ -114,17 +126,99 @@ $responses = [];
             'code' => 200,
             'message' => 'Renamed',
         ])->setStatusCode(200);
-
     }
-public  function destroy($file_id){
-    $file = File::where('file_id', $file_id)->first();
-    $file->delete();
-    return response("sperma");
-}
-public function download($file_id){
-    $file = File::where('file_id', $file_id)->first();
-    $path = Storage::disk("local")->path("\uploads\\1\\". $file->name);
-    return response()->download($path, basename($path));
-}
+
+    public function destroy($file_id)
+    {
+        // Найдем файл по его идентификатору
+        $file = File::where('file_id', $file_id)->firstOrFail();
+
+        // Удаляем файл из хранилища
+        Storage::delete($file->path);
+
+        // Удаляем запись о файле из базы данных
+        $file->delete();
+
+        // Возвращаем ответ об успешном удалении
+        return response()->json([
+            'success' => true,
+            'code' => 200,
+            'message' => 'File deleted',
+        ])->setStatusCode(200);
+    }
+    public function download($file_id){
+        // Найдем файл по его идентификатору
+        $file = File::where('file_id', $file_id)->firstOrFail();
+
+        // Построим путь к файлу в хранилище
+        $filePath = 'uploads/' . $file->user_id . '/' . $file->name;
+
+        // Проверяем, существует ли файл
+        if (!Storage::exists($filePath)) {
+            abort(404);
+        }
+
+        // Отправляем файл для скачивания
+        return response()->download(storage_path('app/' . $filePath), $file->name);
+    }
+    public function owned(Request $request)
+    {
+        // Найти все файлы, которые принадлежат текущему пользователю
+        $files = File::where('user_id', $request->user()->id)->get();
+
+        // Сформировать ответ с информацией о найденных файлах
+        $response = [];
+        foreach ($files as $file) {
+            // Получить всех пользователей, имеющих доступ к этому файлу
+            $accesses = Right::where('file_id', $file->id)->with('user')->get();
+
+            // Подготовка данных о доступах
+            $accesses_data = [];
+            foreach ($accesses as $access) {
+                $accesses_data[] = [
+                    'fullname' => $access->user->first_name . ' ' . $access->user->last_name,
+                    'email' => $access->user->email,
+                    'type' => $access->user_id == $file->user_id ? 'author' : 'co-author',
+                ];
+            }
+
+            $response[] = [
+                'file_id' => $file->file_id,
+                'name' => $file->name,
+                'code' => 200,
+                'url' => url('/file/' . $file->file_id),
+                'accesses' => $accesses_data,
+            ];
+        }
+
+        // Вернуть ответ с информацией о файлах пользователя
+        return response()->json($response);
+    }
+
+    //Функция просмотра файлов, к которым имеет доступ пользователь
+    public function allowed(Request $request)
+    {
+
+        // Получить все записи о доступе пользователя
+        $rights = Right::where('user_id', $request->user()->id)
+            ->whereHas('file') // Отфильтровать только те записи, где есть связанный файл
+            ->with('file')
+            ->get();
+
+        // Сформировать ответ с информацией о файлах, к которым пользователь имеет доступ
+        $response = [];
+        foreach ($rights as $right) {
+            $file = $right->file;
+            $response[] = [
+                'file_id' => $file->file_id,
+                'name' => $file->name,
+                'code' => 200,
+                'url' => url('/file/' . $file->file_id),
+            ];
+        }
+
+        // Вернуть ответ с информацией о файлах, к которым пользователь имеет доступ
+        return response()->json($response);
+    }
 
 }
