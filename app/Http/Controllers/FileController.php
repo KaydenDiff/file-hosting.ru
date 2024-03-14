@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\ApiException;
 use App\Http\Requests\FileRenameRequest;
 use App\Http\Requests\FileStoreRequest;
+use App\Http\Resources\FileResource;
 use App\Models\File;
 use App\Models\Right;
 use App\Models\User;
@@ -161,64 +163,29 @@ $responses = [];
         // Отправляем файл для скачивания
         return response()->download(storage_path('app/' . $filePath), $file->name);
     }
-    public function owned(Request $request)
-    {
-        // Найти все файлы, которые принадлежат текущему пользователю
+    public function owned(Request $request){
+
         $files = File::where('user_id', $request->user()->id)->get();
-
-        // Сформировать ответ с информацией о найденных файлах
-        $response = [];
-        foreach ($files as $file) {
-            // Получить всех пользователей, имеющих доступ к этому файлу
-            $accesses = Right::where('file_id', $file->id)->with('user')->get();
-
-            // Подготовка данных о доступах
-            $accesses_data = [];
-            foreach ($accesses as $access) {
-                $accesses_data[] = [
-                    'fullname' => $access->user->first_name . ' ' . $access->user->last_name,
-                    'email' => $access->user->email,
-                    'type' => $access->user_id == $file->user_id ? 'author' : 'co-author',
-                ];
-            }
-
-            $response[] = [
-                'file_id' => $file->file_id,
-                'name' => $file->name,
-                'code' => 200,
-                'url' => url('/file/' . $file->file_id),
-                'accesses' => $accesses_data,
-            ];
-        }
-
-        // Вернуть ответ с информацией о файлах пользователя
-        return response()->json($response);
+        return response(FileResource::collection($files));
     }
-
     //Функция просмотра файлов, к которым имеет доступ пользователь
-    public function allowed(Request $request)
-    {
+    public function allowed(Request $request){
 
-        // Получить все записи о доступе пользователя
-        $rights = Right::where('user_id', $request->user()->id)
-            ->whereHas('file') // Отфильтровать только те записи, где есть связанный файл
-            ->with('file')
-            ->get();
+        $allowedRights = Right::where('user_id', $request->user()->id)->get();
+        $allowedRightsIds = [];
+        if (!$allowedRights) throw new ApiException(404, 'С ВАМИ НЕ ДЕЛИЛИСЬ ФАЙЛАМИ');
 
-        // Сформировать ответ с информацией о файлах, к которым пользователь имеет доступ
-        $response = [];
-        foreach ($rights as $right) {
-            $file = $right->file;
-            $response[] = [
-                'file_id' => $file->file_id,
-                'name' => $file->name,
-                'code' => 200,
-                'url' => url('/file/' . $file->file_id),
-            ];
+        foreach ($allowedRights as $right){
+            $allowedRightsIds[] = $right->file_id;
+
         }
 
-        // Вернуть ответ с информацией о файлах, к которым пользователь имеет доступ
-        return response()->json($response);
-    }
 
+
+        $allowedFiles = File::whereIn('id', $allowedRightsIds)->get();
+
+
+        return response(FileResource::collection($allowedFiles));
+
+    }
 }
