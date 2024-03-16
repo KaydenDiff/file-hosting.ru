@@ -79,6 +79,7 @@ $responses = [];
 
     public function edit(Request $request, $file_id)
     {
+
         // Проверка аутентификации пользователя
         if (!Auth::check()) {
             return response()->json([
@@ -113,13 +114,20 @@ $responses = [];
         $oldFilePath = 'uploads/' . $file->user_id . '/' . $file->name;
 
         // Формируем новый путь к файлу
-        $newFilePath = 'uploads/' . $file->user_id . '/' . $validatedData['name'];
+        // Получаем расширение файла из старого имени
+        $extension = pathinfo($file->name, PATHINFO_EXTENSION);
 
-        // Переименовываем файл
+// Формируем новое имя файла с тем же расширением
+        $newFileName = $validatedData['name'] . '.' . $extension;
+
+// Формируем новый путь к файлу с новым именем
+        $newFilePath = 'uploads/' . $file->user_id . '/' . $newFileName;
+
+// Переименовываем файл
         Storage::move($oldFilePath, $newFilePath);
 
-        // Обновляем имя файла в базе данных
-        $file->name = $validatedData['name'];
+// Обновляем имя файла в базе данных
+        $file->name = $newFileName;
         $file->save();
 
         // Возвращаем успешный ответ

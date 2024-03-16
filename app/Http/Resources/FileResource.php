@@ -30,7 +30,7 @@ class FileResource extends JsonResource
 
         $accesses = array_merge($data , $data2);
         return[
-            'file_id' => $this->id ,
+            'file_id' => $this->file_id ,
             'name' => $this->name ,
             'code' => 200 ,
             'url' =>  route('files.get', ['file_id' => $this->file_id]) ,

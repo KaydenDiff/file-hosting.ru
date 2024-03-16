@@ -14,14 +14,17 @@ class CoauthorsResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
-            'fullname' => $this->user()->first_name. ' ' . $this->user()->last_name,
-            'email' => $this->user()->email,
-            'type'=>'co-author',
-  'code'=> 200
-
-
-            // Другие поля вашей модели, которые вы хотите включить
-        ];
+        $user = $this->user()->first(); // Получить первый экземпляр пользователя из отношения BelongsTo
+        if ($user) {
+            return [
+                'fullname' => $user->first_name . ' ' . $user->last_name,
+                'email' => $user->email,
+                'type' => 'co-author',
+                'code' => 200
+            ];
+        } else {
+            // Логика для случая, когда пользователя не найдено
+            return [];
+        }
     }
 }
